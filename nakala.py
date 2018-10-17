@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import xml.etree.cElementTree as ElementTree
+import xmltodict
 
 from shutil import rmtree, copyfile, make_archive
 from collections import defaultdict
@@ -9,11 +10,15 @@ from utils.prepare import prepare
 from utils.Document import Document
 from utils.Collection import Collection
 
-from settings import fonds_name, fonds_handler, src
+from settings import fonds_name, fonds_handler, src, imgs
 
 from console.execute import nakalaPush
 
 
+
+####################################
+#--- HELPERS & GLOBAL VARIABLES ---#
+####################################
 
 def resetDir(dir):
     if os.path.isdir(dir):
@@ -21,66 +26,100 @@ def resetDir(dir):
     os.mkdir(dir)
 
 
-dest= 'console/input/'
-data = prepare(src)
+if __name__ == '__main__':
+
+    # Location to store archives created from the archives' index
+    dest = 'console/input/'
+
+    # Load the data and clean some stuff
+    data = prepare(src)
 
 
-######################################################
-#--- Envoie des collections secondaires (dossier) ---#
-######################################################
+    ######################################################
+    #--- Envoie des collections secondaires (dossier) ---#
+    ######################################################
 
-for dossier, grp in data.groupby('dossier'):
-    if dossier == '':
-        continue
-    # Create collection file
-    c = Collection(name=dossier,
-                    creator='www.archivesdelacritiquedart.fr',
-                    provenance=fonds_name,
-                    inCollection=fonds_handler)
-    c.write(dest)
-    break
+    for dossier, grp in data.groupby('dossier'):
+        if dossier == '':
+            dossier = 'unknown'
+
+        # Create collection file
+        c = Collection(name=dossier,
+                        creator='www.archivesdelacritiquedart.fr',
+                        provenance=fonds_name,
+                        inCollection=fonds_handler)
+
+        # Save the collection as zip archive
+        c.write(dest)
+        break
 
 
-###########################################
-#--- Envoie des collections sur NAKALA ---#
-###########################################
+    ###########################################
+    #--- Envoie des collections sur NAKALA ---#
+    ###########################################
 
-nakalaPush()
+    # Push data to NAKALA using jar provided by HumaNum
+    nakalaPush()
 
-#################################################
-#--- Récupération des handler de collections ---#
-#################################################
 
-output_dir = 'console/output/ok/'
-if os.path.isdir(output_dir):
-    collections_handler = dict()
+    #################################################
+    #--- Récupération des handler de collections ---#
+    #################################################
 
-    print('[ + ] Retrieved the folling collections')
-    for f in [f if f.endswith('.xml') for f in os.listdir(output_dir)]:
-        e = ElementTree.parse(os.path.join(output_dir, f)).getroot()
+    log_dir = 'console/output/ok/'
+    if os.path.isdir(log_dir):
+        collections_handler = dict()
 
-        c_handler = e.find('identifier').get()
-        c_name = f.replace('.xml', '')
-        collections_handler[c_name] = c_handler
+        print('[ + ] Retrieved the folling collections')
+        for f in [f for f in os.listdir(log_dir) if f.endswith('.xml')]:
+            file = log_dir + f
+            with open(file) as fd:
+                # Parse returned xml files
+                xml = xmltodict.parse(fd.read())
 
-        print('\tCollection: {n}\t\tHandler: {h}'.format(n=c_name, h=c_handler))
+                # Retrive collection name and handler. Then store in dict
+                c_handler = xml['nkl:Collection']['identifier']['#text']
+                c_name = xml['nkl:Collection']['dcterms:title']
+                collections_hdlr[c_name] = c_handler
 
-############################
-#--- Envoie des données ---#
-############################
+                print('\t* collection: {n}\n\t  handler: {h}\n'.format(
+                                                        n=c_name, h=c_handler))
+    else:
+        # If pushing data to NAKALA failed, no 'ok' directory is created
+        print('\n[ ! ] It seems that their was a problem when pushing the data to NAKALA.')
+        print('\tNo output data has been found.')
+        print('\tContact a developper to help you on this one.\n')
+        exit()
 
-# Iterate through all documents in folder
-for _, doc in grp.iterrows():
 
-    if doc['Auteur principal']:
-        m = Document(doc, dossier)
+    ######################################################
+    #--- Envoie des données et métadonnées sur NAKALA ---#
+    ######################################################
 
-    if doc['Nom du photogr.']:
-        m = Document(doc, dossier, author=False)
+    init counter for archive name
+    i = 0
 
-    # Create/empty dir to store files
-    outfpath = dest + str(i) + '/'
-    resetDir(outfpath)
+    Iterate through all documents in folder
+    for _, doc in grp.iterrows():
 
-    # Store metadata in outfpath
-    m.write(outfpath)
+        if doc['Auteur principal']:
+            m = Document(doc, dossier, imgs)
+
+        if doc['Nom du photogr.']:
+            m = Document(doc, dossier, imgs, author=False)
+
+        # Create/empty dir to store files
+        outfpath = dest + str(i) + '/'
+        resetDir(outfpath)
+
+        # Store metadata and data in nakala console input
+        m.write(outfpath)
+
+        i += 1
+
+    nakalaPush()
+
+
+    ####################
+    #--- Verify logs --#
+    ####################

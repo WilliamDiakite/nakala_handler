@@ -2,7 +2,6 @@ import pandas as pd
 import datetime
 import os
 
-from ..settings import imgs
 
 
 otherProps = {
@@ -23,7 +22,8 @@ otherProps = {
 
 class Document(object):
 
-    def __init__(self, data, dossier, author=True):
+    def __init__(self, data, dossier, imgs, author=True):
+        self.imgs = imgs
         self.props = [
             {'title': data["Titre du doc. ou de l'œuvre"]},
             {'creator': None},
@@ -70,11 +70,11 @@ class Document(object):
 
         # Add data files (.png) to directory
         for f in m.files:
-            s = imgs + f
+            s = self.imgs + f
             if os.path.isfile(s):
                 copyfile(s, outfpath+f)
             else:
-                e = imgs + f
+                e = self.imgs + f
                 print('[ ! ] the following image was not found >', e, '')
 
         shutil.make_archive(archive, 'zip', archive)
