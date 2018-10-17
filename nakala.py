@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-import xml.etree.cElementTree as ElementTree
+import xml.etree.cElementTree as ET
 import xmltodict
 
 from shutil import rmtree, copyfile, make_archive
@@ -24,6 +24,28 @@ def resetDir(dir):
     if os.path.isdir(dir):
         rmtree(dir)
     os.mkdir(dir)
+
+
+def check_logs(logPath='./console/output/'):
+    errors = dict()
+    for f in os.listdir(logPath):
+        if 'report' in f:
+            # parse log file
+            report = ET.parse(logPath + f).getroot()
+
+            # Get general stats
+            nb_valid = report.find('nb_files_valid').text
+            nb_invalid = report.find('nb_files_invalid').text
+            print('\n------- NAKALA REPORT -------\n')
+            print('\t', nb_valid, 'valid file(s)')
+            print('\t', nb_invalid, 'invalid file(s)')
+
+
+            # Go through all invalid files and store error
+            # for f in report['files_treated']:
+            #     print(f)
+            #     print('\n------------\n')
+
 
 
 if __name__ == '__main__':
@@ -51,7 +73,6 @@ if __name__ == '__main__':
 
         # Save the collection as zip archive
         c.write(dest)
-        break
 
 
     ###########################################
@@ -66,13 +87,16 @@ if __name__ == '__main__':
     #--- Récupération des handler de collections ---#
     #################################################
 
+    # NOTE: needs to deal with partial sending
+
     log_dir = 'console/output/ok/'
     if os.path.isdir(log_dir):
-        collections_handler = dict()
+        collections_hdlr = dict()
 
         print('[ + ] Retrieved the folling collections')
         for f in [f for f in os.listdir(log_dir) if f.endswith('.xml')]:
             file = log_dir + f
+
             with open(file) as fd:
                 # Parse returned xml files
                 xml = xmltodict.parse(fd.read())
@@ -88,34 +112,43 @@ if __name__ == '__main__':
         # If pushing data to NAKALA failed, no 'ok' directory is created
         print('\n[ ! ] It seems that their was a problem when pushing the data to NAKALA.')
         print('\tNo output data has been found.')
-        print('\tContact a developper to help you on this one.\n')
-        exit()
+        print('\tSee report for more details.\n')
 
 
-    ######################################################
-    #--- Envoie des données et métadonnées sur NAKALA ---#
-    ######################################################
+    ####################
+    #--- Verify logs --#
+    ####################
 
-    init counter for archive name
+    check_logs()
+
+    exit()
+
+
+    #########################################################
+    #--- Création des archives de données et métadonnées ---#
+    #########################################################
+
+    # init counter for archive name
     i = 0
 
-    Iterate through all documents in folder
-    for _, doc in grp.iterrows():
+    # Iterate through all documents in folder
+    for dossier, grp in data.groupby('dossier'):
+        for _, doc in grp.iterrows():
 
-        if doc['Auteur principal']:
-            m = Document(doc, dossier, imgs)
+            if doc['Auteur principal']:
+                m = Document(doc, dossier, imgs)
 
-        if doc['Nom du photogr.']:
-            m = Document(doc, dossier, imgs, author=False)
+            if doc['Nom du photogr.']:
+                m = Document(doc, dossier, imgs, author=False)
 
-        # Create/empty dir to store files
-        outfpath = dest + str(i) + '/'
-        resetDir(outfpath)
+            # Create/empty dir to store files
+            outfpath = dest + str(i) + '/'
+            resetDir(outfpath)
 
-        # Store metadata and data in nakala console input
-        m.write(outfpath)
+            # Store metadata and data in nakala console input
+            m.write(outfpath)
 
-        i += 1
+            i += 1
 
     nakalaPush()
 
@@ -123,3 +156,5 @@ if __name__ == '__main__':
     ####################
     #--- Verify logs --#
     ####################
+
+    # ...
