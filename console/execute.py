@@ -12,7 +12,6 @@ def nakalaPush():
     # Execute command
     print('[ + ] Launching Nakala subprocess\n')
     os.system(cmd)
-    print('\n------ done pushing data ------\n')
 
     # go back to original directory
     os.chdir('../')
