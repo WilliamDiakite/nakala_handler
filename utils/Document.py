@@ -33,7 +33,7 @@ class Document(object):
             {'format': data['Typologie doc']},
             {'issued': datetime.datetime.now().strftime('%Y-%m-%d')},
             {'modified': datetime.datetime.now().strftime('%Y-%m-%d')},
-            {'nkl:inCollection': dossier[1]},
+            {'nkl:inCollection': dossier},
             {'publisher': 'www.archivesdelacritiquedart.org'}
         ]
         if author:

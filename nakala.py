@@ -47,6 +47,23 @@ def check_logs(logPath='./console/output/'):
             #     print('\n------------\n')
 
 
+def metadata_to_archive(doc, ref, hdlr, dest):
+
+    if doc['Auteur principal']:
+        m = Document(doc, hdlr, imgs)
+
+    if doc['Nom du photogr.']:
+        m = Document(doc, hdlr, imgs, author=False)
+
+    # Create/empty dir to store files
+    outfpath = dest + str(i) + '/'
+    resetDir(outfpath)
+
+    # Store metadata and data in nakala console input
+    m.write(outfpath)
+
+    i += 1
+
 
 if __name__ == '__main__':
 
@@ -121,8 +138,6 @@ if __name__ == '__main__':
 
     check_logs()
 
-    exit()
-
 
     #########################################################
     #--- Création des archives de données et métadonnées ---#
@@ -132,24 +147,24 @@ if __name__ == '__main__':
     i = 0
 
     # Iterate through all documents in folder
+    print('\n[ + ] Preparing data and metadata\n')
     for dossier, grp in data.groupby('dossier'):
         for _, doc in grp.iterrows():
 
-            if doc['Auteur principal']:
-                m = Document(doc, dossier, imgs)
+            if not dossier in collections_hdlr:
+                print('\n[ + ] The following collection', dossier, 'seems to be not created yet')
+                hdlr = input('[ ? ] If the collection exists already, please enter the handler:')
+                collections_hdlr[dossier] = hdlr
 
-            if doc['Nom du photogr.']:
-                m = Document(doc, dossier, imgs, author=False)
-
-            # Create/empty dir to store files
-            outfpath = dest + str(i) + '/'
-            resetDir(outfpath)
-
-            # Store metadata and data in nakala console input
-            m.write(outfpath)
-
+            metadata_to_archive(doc, i, collections_hdlr[dossier], dest)
             i += 1
 
+
+    ################################################
+    #--- Envoie des data et metadata sur NAKALA ---#
+    ################################################
+
+    # Push data to NAKALA using jar provided by HumaNum
     nakalaPush()
 
 
@@ -157,4 +172,4 @@ if __name__ == '__main__':
     #--- Verify logs --#
     ####################
 
-    # ...
+    check_logs()
